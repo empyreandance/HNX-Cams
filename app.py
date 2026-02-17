@@ -18,20 +18,18 @@ def load_data():
 
 # Helper: Detect Caltrans District and clean ID for direct video player
 def get_video_info(lat, lon, name):
-    # Standardize the name into a video ID (strip spaces and special chars)
+    # Standardize the name into a video ID
     cam_id = re.sub(r'[^a-zA-Z0-9]', '', name).lower()
     
-    # Logic to assign District based on Hanford CWA geography
-    # D10: Merced, Mariposa
-    # D06: Fresno, Madera, Kings, Tulare, Western Kern
-    # D09: Eastern Kern (Mojave/Tehachapi areas)
-    
-    if lat > 37.3:
-        dist = "d10" # Northern CWA (Mariposa/Merced)
-    elif lon > -118.5 and lat < 35.8:
-        dist = "d09" # Eastern Kern/Mojave area
+    # Precise District Logic based on Caltrans Jurisdictional Maps
+    if lat > 37.25:
+        dist = "d10"  # Mariposa, Merced, Tuolumne
+    elif lon > -118.45:
+        dist = "d09"  # Eastern Kern/Mono/Inyo
+    elif lat < 35.2 and lon < -119.5:
+        dist = "d07"  # Very southern fringe (LA/Ventura border)
     else:
-        dist = "d06" # Central Valley core
+        dist = "d06"  # Fresno, Madera, Kings, Tulare, Western Kern
         
     return f"https://cwwp2.dot.ca.gov/vm/loc/{dist}/{cam_id}.htm"
 
@@ -101,3 +99,4 @@ try:
 
 except Exception as e:
     st.error(f"⚠️ Error: {e}")
+

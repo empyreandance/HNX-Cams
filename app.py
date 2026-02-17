@@ -25,43 +25,31 @@ def get_video_info(row):
         dist = "d06"
     return f"https://cwwp2.dot.ca.gov/vm/loc/{dist}/{cam_id}.htm"
 
-# Custom CSS to make buttons Red
-st.markdown("""
-    <style>
-    div.stButton > button:first-child {
-        background-color: #d62828;
-        color: white;
-        border-radius: 5px;
-    }
-    div.stButton > button:hover {
-        background-color: #f94144;
-        color: white;
-    }
-    </style>
-""", unsafe_content_type=True)
-
 try:
     df = load_data()
     st.sidebar.title("🛠️ Dashboard Controls")
     st.sidebar.subheader("Quick Elevation Filter")
     
+    # Initialize session state for slider
     if 'elev_slider' not in st.session_state:
         st.session_state.elev_slider = (int(df['elevation'].min()), int(df['elevation'].max()))
 
+    # Button Grid
     col1, col2 = st.sidebar.columns(2)
-    # Using '1,000+ ft' labels for reliability
     presets = [1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000]
     
     for i, p in enumerate(presets):
         target_col = col1 if i % 2 == 0 else col2
-        if target_col.button(f"{p:,}+ ft", key=f"final_btn_{p}"):
+        # Using the '+' format as requested
+        if target_col.button(f"{p:,}+ ft", key=f"fixed_btn_{p}"):
             st.session_state.elev_slider = (p, int(df['elevation'].max()))
 
-    if st.sidebar.button("🔄 Reset to All", key="final_btn_reset"):
+    if st.sidebar.button("🔄 Reset to All", key="fixed_btn_reset"):
         st.session_state.elev_slider = (int(df['elevation'].min()), int(df['elevation'].max()))
 
     st.sidebar.markdown("---")
 
+    # Manual Slider
     elev_range = st.sidebar.slider(
         "Manual Elevation Filter (ft)", 
         int(df['elevation'].min()), 

@@ -29,29 +29,32 @@ try:
     df = load_data()
     st.sidebar.title("🛠️ Dashboard Controls")
     
-    # --- Quick Elevation Presets with EXPLICIT > Signs ---
+    # --- Quick Elevation Presets (Modified for Force Refresh) ---
     st.sidebar.subheader("Quick Elevation Filter")
     
-    # Initialize session state for slider
     if 'elev_slider' not in st.session_state:
         st.session_state.elev_slider = (int(df['elevation'].min()), int(df['elevation'].max()))
 
-    # Create a 2x4 grid for buttons
     col1, col2 = st.sidebar.columns(2)
-    presets = [1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000]
+    # Using a list of tuples to be absolutely explicit with the labels
+    presets = [
+        (1000, "> 1000 ft"), (2000, "> 2000 ft"), 
+        (3000, "> 3000 ft"), (4000, "> 4000 ft"), 
+        (5000, "> 5000 ft"), (6000, "> 6000 ft"), 
+        (7000, "> 7000 ft"), (8000, "> 8000 ft")
+    ]
     
-    for i, p in enumerate(presets):
+    for i, (val, label) in enumerate(presets):
         target_col = col1 if i % 2 == 0 else col2
-        # EXPLICIT label update: "> {p} ft"
-        if target_col.button(f"> {p} ft", key=f"btn_{p}"):
-            st.session_state.elev_slider = (p, int(df['elevation'].max()))
+        # Adding 'v2' to the key forces Streamlit to treat this as a brand-new UI element
+        if target_col.button(label, key=f"btn_v2_{val}"):
+            st.session_state.elev_slider = (val, int(df['elevation'].max()))
 
-    if st.sidebar.button("🔄 Reset to All", key="btn_reset"):
+    if st.sidebar.button("🔄 Reset to All", key="btn_v2_reset"):
         st.session_state.elev_slider = (int(df['elevation'].min()), int(df['elevation'].max()))
 
     st.sidebar.markdown("---")
 
-    # Slider linked to state
     elev_range = st.sidebar.slider(
         "Manual Elevation Filter (ft)", 
         int(df['elevation'].min()), 
@@ -59,7 +62,6 @@ try:
         key="elev_slider"
     )
 
-    # Filtered strictly by elevation
     filtered_df = df[df['elevation'].between(elev_range[0], elev_range[1])]
 
     # --- Map Interface ---

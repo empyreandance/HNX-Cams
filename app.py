@@ -29,7 +29,7 @@ try:
     df = load_data()
     st.sidebar.title("🛠️ Dashboard Controls")
     
-    # --- Quick Elevation Presets with > Signs ---
+    # --- Quick Elevation Presets with EXPLICIT > Signs ---
     st.sidebar.subheader("Quick Elevation Filter")
     
     # Initialize session state for slider
@@ -42,11 +42,11 @@ try:
     
     for i, p in enumerate(presets):
         target_col = col1 if i % 2 == 0 else col2
-        # Added the '>' sign to the label here
-        if target_col.button(f"> {p} ft"):
+        # EXPLICIT label update: "> {p} ft"
+        if target_col.button(f"> {p} ft", key=f"btn_{p}"):
             st.session_state.elev_slider = (p, int(df['elevation'].max()))
 
-    if st.sidebar.button("🔄 Reset to All"):
+    if st.sidebar.button("🔄 Reset to All", key="btn_reset"):
         st.session_state.elev_slider = (int(df['elevation'].min()), int(df['elevation'].max()))
 
     st.sidebar.markdown("---")

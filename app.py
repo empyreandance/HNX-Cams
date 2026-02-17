@@ -3,56 +3,66 @@ import pandas as pd
 import folium
 from streamlit_folium import st_folium
 from streamlit_autorefresh import st_autorefresh
-import requests
-import re
 
-# 1. Setup & Auto-Refresh (Every 5 mins)
-st.set_page_config(layout="wide", page_title="Hanford CWA Dashboard")
-st_autorefresh(interval=5 * 60 * 1000, key="datarefresh")
+# 1. Page Configuration & Auto-Refresh (Updates every 10 mins)
+st.set_page_config(layout="wide", page_title="Hanford CWA Webcam Dashboard", page_icon="🏔️")
+st_autorefresh(interval=10 * 60 * 1000, key="cctv_refresh")
 
-# 2. Helper: Get Elevation from USGS
-def get_elevation(lat, lon):
-    try:
-        url = f"https://epqs.nationalmap.gov/v1/json?x={lon}&y={lat}&units=Feet&output=json"
-        res = requests.get(url, timeout=5).json()
-        return int(res['value'])
-    except:
-        return 0
+# 2. Data Connection (Your Google Sheet CSV)
+DATA_SOURCE = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRAewePdABLXrhPZPwsQUqPh6GjHZ8_kgaZM4x367YL5QNv0-w1TViJPWoag4j0sWzCM7VMK-Leuf6A/pub?output=csv"
 
-# 3. Helper: Extract URL from Messy HTML
-def extract_url(html):
-    match = re.search(r'src="([^"]+)"', str(html))
-    return match.group(1) if match else None
+@st.cache_data(ttl=600)
+def load_data():
+    # Reading your clean columns: lon, lat, name, url, elevation
+    return pd.read_csv(DATA_SOURCE)
 
-# 4. Load & Process Data
-@st.cache_data
-def load_and_clean_data():
-    df = pd.read_csv("cctv.csv")
-    # Identify columns from your screenshot
-    df.columns = ['lon', 'lat', 'name', 'description']
-    df['cam_url'] = df['description'].apply(extract_url)
+# 3. Sidebar Setup (Filters & Search)
+st.sidebar.title("🛠️ Dashboard Controls")
+
+try:
+    df = load_data()
     
-    # Fetch elevation for each point (cached so it only runs once!)
-    with st.spinner("Fetching altitudes for new cameras..."):
-        df['elevation'] = df.apply(lambda x: get_elevation(x['lat'], x['lon']), axis=1)
-    return df
+    # Text Search
+    search_query = st.sidebar.text_input("Search Camera Name", placeholder="e.g. SR-20")
 
-df = load_and_clean_data()
+    # Elevation Slider
+    min_e, max_e = int(df['elevation'].min()), int(df['elevation'].max())
+    elev_range = st.sidebar.slider("Elevation Filter (ft)", min_e, max_e, (min_e, max_e))
 
-# 5. Sidebar Filter
-st.sidebar.header("Filter by Altitude")
-min_e = int(df['elevation'].min())
-max_e = int(df['elevation'].max())
-elev_range = st.sidebar.slider("Elevation (ft)", min_e, max_e, (min_e, max_e))
+    # 4. Filter Logic
+    filtered_df = df[
+        (df['elevation'] >= elev_range[0]) & 
+        (df['elevation'] <= elev_range[1]) &
+        (df['name'].str.contains(search_query, case=False))
+    ]
 
-# 6. Filter & Display Map
-filtered = df[(df['elevation'] >= elev_range[0]) & (df['elevation'] <= elev_range[1])]
+    # 5. Main Map Interface
+    st.title(f"📡 Hanford CWA Live Feeds ({len(filtered_df)} active)")
+    
+    # Centers map based on your actual data points
+    m = folium.Map(
+        location=[filtered_df['lat'].mean(), filtered_df['lon'].mean()], 
+        zoom_start=8, 
+        tiles="OpenTopoMap"
+    )
 
-st.title(f"HNX CWA Live Feeds: {len(filtered)} active")
-m = folium.Map(location=[36.32, -119.64], zoom_start=8, tiles="OpenTopoMap")
+    for _, row in filtered_df.iterrows():
+        # Using the clean 'url' column for the live image preview
+        popup_html = f'''
+            <div style="width:300px">
+                <h4 style="margin-bottom:5px;">{row['name']}</h4>
+                <p style="margin-top:0;">Elevation: <b>{row['elevation']} ft</b></p>
+                <img src="{row['url']}" width="100%" style="border-radius:5px;">
+                <br><a href="{row['url']}" target="_blank">Open Full Image</a>
+            </div>
+        '''
+        folium.Marker(
+            [row['lat'], row['lon']], 
+            popup=folium.Popup(popup_html, max_width=350),
+            tooltip=row['name']
+        ).add_to(m)
 
-for _, row in filtered.iterrows():
-    html = f"<b>{row['name']}</b><br>Elev: {row['elevation']}ft<br><img src='{row['cam_url']}' width='300px'>"
-    folium.Marker([row['lat'], row['lon']], popup=folium.Popup(html, max_width=350)).add_to(m)
+    st_folium(m, width=1400, height=800)
 
-st_folium(m, width=1200, height=650)
+except Exception as e:
+    st.error(f"⚠️ Unable to load data. Please check your Google Sheet link. Error: {e}")

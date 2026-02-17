@@ -25,27 +25,39 @@ def get_video_info(row):
         dist = "d06"
     return f"https://cwwp2.dot.ca.gov/vm/loc/{dist}/{cam_id}.htm"
 
+# Custom CSS to make buttons Red
+st.markdown("""
+    <style>
+    div.stButton > button:first-child {
+        background-color: #d62828;
+        color: white;
+        border-radius: 5px;
+    }
+    div.stButton > button:hover {
+        background-color: #f94144;
+        color: white;
+    }
+    </style>
+""", unsafe_content_type=True)
+
 try:
     df = load_data()
     st.sidebar.title("🛠️ Dashboard Controls")
-    
     st.sidebar.subheader("Quick Elevation Filter")
     
     if 'elev_slider' not in st.session_state:
         st.session_state.elev_slider = (int(df['elevation'].min()), int(df['elevation'].max()))
 
     col1, col2 = st.sidebar.columns(2)
-    # Using Unicode \u003E to force the '>' symbol to render
+    # Using '1,000+ ft' labels for reliability
     presets = [1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000]
     
     for i, p in enumerate(presets):
         target_col = col1 if i % 2 == 0 else col2
-        # Hard-coded Unicode string to bypass text stripping
-        label_text = f"\u003E {p} ft"
-        if target_col.button(label_text, key=f"force_btn_{p}"):
+        if target_col.button(f"{p:,}+ ft", key=f"final_btn_{p}"):
             st.session_state.elev_slider = (p, int(df['elevation'].max()))
 
-    if st.sidebar.button("🔄 Reset to All", key="force_btn_reset"):
+    if st.sidebar.button("🔄 Reset to All", key="final_btn_reset"):
         st.session_state.elev_slider = (int(df['elevation'].min()), int(df['elevation'].max()))
 
     st.sidebar.markdown("---")
@@ -60,7 +72,7 @@ try:
     filtered_df = df[df['elevation'].between(elev_range[0], elev_range[1])]
 
     # --- Map Interface ---
-    st.title(f"Hanford CWA Live Feeds ({len(filtered_df)} Cameras)")
+    st.title(f"📡 Hanford CWA Live Feeds ({len(filtered_df)} Cameras)")
     scan_time = datetime.utcnow().strftime('%H:%M UTC')
     st.caption(f"Radar Auto-Refresh Active | Current UTC: {scan_time}")
 

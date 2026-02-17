@@ -3,91 +3,80 @@ import pandas as pd
 import folium
 from streamlit_folium import st_folium
 from streamlit_autorefresh import st_autorefresh
+from datetime import datetime
 
-# 1. Page Configuration & Auto-Refresh (Every 10 mins)
-st.set_page_config(layout="wide", page_title="Hanford CWA Webcam Dashboard", page_icon="📡")
-st_autorefresh(interval=10 * 60 * 1000, key="cctv_refresh")
+# 1. Config & Auto-Refresh (Updates every 5 mins for radar)
+st.set_page_config(layout="wide", page_title="HNX Live Feeds", page_icon="📡")
+st_autorefresh(interval=5 * 60 * 1000, key="radar_refresh")
 
-# 2. DATA SOURCE: Pointing to your new Hanford-only CSV
 DATA_SOURCE = "https://raw.githubusercontent.com/empyreandance/HNX-Cams/main/cctv_hnx.csv"
 
-@st.cache_data(ttl=600)
+@st.cache_data(ttl=300)
 def load_data():
     return pd.read_csv(DATA_SOURCE)
 
 try:
     df = load_data()
+    st.sidebar.title("🛠️ Controls")
+    search_query = st.sidebar.text_input("Search Camera", placeholder="e.g. Tehachapi")
+    elev_range = st.sidebar.slider("Elevation (ft)", int(df['elevation'].min()), int(df['elevation'].max()), (int(df['elevation'].min()), int(df['elevation'].max())))
+
+    filtered_df = df[(df['elevation'].between(elev_range[0], elev_range[1])) & (df['name'].str.contains(search_query, case=False))]
+
+    # 2. Map Setup
+    st.title(f"📡 Hanford CWA Live Feeds ({len(filtered_df)} Cameras)")
     
-    # 3. Sidebar Search & Filter
-    st.sidebar.title("🛠️ Dashboard Controls")
-    search_query = st.sidebar.text_input("Search Camera Name", placeholder="e.g. Tehachapi")
+    # Display Scan Time
+    scan_time = datetime.utcnow().strftime('%H:%M UTC')
+    st.caption(f"Radar Auto-Refresh Active | Latest Scan approx: {scan_time}")
 
-    min_e, max_e = int(df['elevation'].min()), int(df['elevation'].max())
-    elev_range = st.sidebar.slider("Elevation Filter (ft)", min_e, max_e, (min_e, max_e))
+    m = folium.Map(location=[36.32, -119.64], zoom_start=8, tiles="OpenTopoMap")
 
-    # 4. Filter Logic
-    filtered_df = df[
-        (df['elevation'] >= elev_range[0]) & 
-        (df['elevation'] <= elev_range[1]) &
-        (df['name'].str.contains(search_query, case=False))
-    ]
-
-    # 5. Main Map Interface
-    st.title(f"🌨️ Hanford CWA Live Feeds ({len(filtered_df)} Cameras)")
-    
-    # Centers map on the heart of the HNX CWA (Hanford/Visalia area)
-    m = folium.Map(
-        location=[36.32, -119.64], 
-        zoom_start=8, 
-        tiles="OpenTopoMap"
-    )
-
-    # 6. Add NWS Weather Radar Overlay
+    # 3. Radar Layer
     folium.WmsTileLayer(
         url="https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi",
         layers="nexrad-n0q-900913",
-        name="Live Radar (NEXRAD)",
+        name="Live Radar",
         fmt="image/png",
         transparent=True,
-        opacity=0.55,
+        opacity=0.5,
         control=True
     ).add_to(m)
 
-    # 7. Add Camera Markers
     for _, row in filtered_df.iterrows():
-        # Dynamic link to the Caltrans Live Player
-        live_link = f"https://quickmap.dot.ca.gov/?cms={row['name'].replace(' ', '')}"
+        # IMPROVED LINK: Direct query for QuickMap
+        clean_name = row['name'].split(':')[0].strip() if ':' in row['name'] else row['name']
+        live_link = f"https://quickmap.dot.ca.gov/?vcam={clean_name}"
         
         html = f'''
             <div style="width:280px; font-family: sans-serif;">
-                <h4 style="margin:0 0 5px 0; color: #1f77b4;">{row['name']}</h4>
-                <p style="margin:0 0 10px 0; font-size: 13px;">Elevation: <b>{row['elevation']} ft</b></p>
-                <img src="{row['url']}" width="100%" style="border-radius:8px; border: 1px solid #ddd;">
-                <div style="margin-top: 12px; text-align: center;">
+                <h4 style="margin:0; color: #d62828;">{row['name']}</h4>
+                <p style="margin:5px 0; font-size: 12px;">Elev: {row['elevation']} ft</p>
+                <img src="{row['url']}" width="100%" style="border-radius:5px;">
+                <div style="margin-top: 10px; text-align: center;">
                     <a href="{live_link}" target="_blank" 
-                       style="background-color: #d62828; color: white; padding: 8px 15px; 
-                       text-decoration: none; border-radius: 20px; font-size: 12px; font-weight: bold; display: inline-block;">
-                       🎥 OPEN LIVE STREAM
+                       style="background-color: #d62828; color: white; padding: 6px 12px; 
+                       text-decoration: none; border-radius: 15px; font-size: 11px; font-weight: bold;">
+                       🎥 OPEN QUICKMAP LIVE
                     </a>
                 </div>
             </div>
         '''
         
-        # Using smaller CircleMarkers for professional GIS look
+        # RED CircleMarkers
         folium.CircleMarker(
             location=[row['lat'], row['lon']],
             radius=6,
-            color="#1f77b4",
+            color="#d62828",  # Red border
             fill=True,
-            fill_opacity=0.8,
+            fill_color="#d62828", # Red fill
+            fill_opacity=0.7,
             popup=folium.Popup(html, max_width=300),
-            tooltip=f"{row['name']} ({row['elevation']} ft)"
+            tooltip=row['name']
         ).add_to(m)
 
-    # Add Layer Control to toggle Radar on/off
     folium.LayerControl().add_to(m)
-
     st_folium(m, width=1400, height=800)
 
 except Exception as e:
-    st.error(f"⚠️ App is updating or data is missing. Error: {e}")
+    st.error(f"Error: {e}")

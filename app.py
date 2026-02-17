@@ -4,28 +4,24 @@ import folium
 from streamlit_folium import st_folium
 from streamlit_autorefresh import st_autorefresh
 
-# 1. Page Configuration & Auto-Refresh (Updates every 10 mins)
+# 1. Page Configuration
 st.set_page_config(layout="wide", page_title="Hanford CWA Webcam Dashboard", page_icon="🏔️")
 st_autorefresh(interval=10 * 60 * 1000, key="cctv_refresh")
 
-# 2. Data Connection (Your Google Sheet CSV)
-DATA_SOURCE = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRAewePdABLXrhPZPwsQUqPh6GjHZ8_kgaZM4x367YL5QNv0-w1TViJPWoag4j0sWzCM7VMK-Leuf6A/pub?output=csv"
+# 2. DATA SOURCE: Using your GitHub Raw Link
+DATA_SOURCE = "https://raw.githubusercontent.com/empyreandance/HNX-Cams/main/cctv_final.csv"
 
 @st.cache_data(ttl=600)
 def load_data():
-    # Reading your clean columns: lon, lat, name, url, elevation
     return pd.read_csv(DATA_SOURCE)
-
-# 3. Sidebar Setup (Filters & Search)
-st.sidebar.title("🛠️ Dashboard Controls")
 
 try:
     df = load_data()
     
-    # Text Search
+    # 3. Sidebar Search & Filter
+    st.sidebar.title("🛠️ Dashboard Controls")
     search_query = st.sidebar.text_input("Search Camera Name", placeholder="e.g. SR-20")
 
-    # Elevation Slider
     min_e, max_e = int(df['elevation'].min()), int(df['elevation'].max())
     elev_range = st.sidebar.slider("Elevation Filter (ft)", min_e, max_e, (min_e, max_e))
 
@@ -47,22 +43,22 @@ try:
     )
 
     for _, row in filtered_df.iterrows():
-        # Using the clean 'url' column for the live image preview
-        popup_html = f'''
+        # Using your clean 'url' column for the live images
+        html = f'''
             <div style="width:300px">
                 <h4 style="margin-bottom:5px;">{row['name']}</h4>
                 <p style="margin-top:0;">Elevation: <b>{row['elevation']} ft</b></p>
                 <img src="{row['url']}" width="100%" style="border-radius:5px;">
-                <br><a href="{row['url']}" target="_blank">Open Full Image</a>
+                <br><a href="{row['url']}" target="_blank" style="font-size:12px;">Open Full Image</a>
             </div>
         '''
         folium.Marker(
             [row['lat'], row['lon']], 
-            popup=folium.Popup(popup_html, max_width=350),
+            popup=folium.Popup(html, max_width=350),
             tooltip=row['name']
         ).add_to(m)
 
     st_folium(m, width=1400, height=800)
 
 except Exception as e:
-    st.error(f"⚠️ Unable to load data. Please check your Google Sheet link. Error: {e}")
+    st.error(f"Connecting to GitHub data... If this persists, verify cctv_final.csv is in your repo. Error: {e}")

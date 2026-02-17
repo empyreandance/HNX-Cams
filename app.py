@@ -17,19 +17,18 @@ def load_data():
     return pd.read_csv(DATA_SOURCE)
 
 # Helper: Detect Caltrans District and clean ID for direct video player
-def get_video_info(lat, lon, name):
-    # Standardize the name into a video ID
-    cam_id = re.sub(r'[^a-zA-Z0-9]', '', name).lower()
+def get_video_info(row):
+    # 1. Standardize the name into a video ID
+    cam_id = re.sub(r'[^a-zA-Z0-9]', '', row['name']).lower()
     
-    # Precise District Logic based on Caltrans Jurisdictional Maps
-    if lat > 37.25:
-        dist = "d10"  # Mariposa, Merced, Tuolumne
-    elif lon > -118.45:
-        dist = "d09"  # Eastern Kern/Mono/Inyo
-    elif lat < 35.2 and lon < -119.5:
-        dist = "d07"  # Very southern fringe (LA/Ventura border)
-    else:
-        dist = "d06"  # Fresno, Madera, Kings, Tulare, Western Kern
+    # 2. Extract District directly from the static image URL
+    # If row['url'] is 'https://cwwp2.dot.ca.gov/data/d10/cctv/image/...'
+    # we want to grab 'd10'
+    try:
+        match = re.search(r'/data/(d\d+)/', str(row['url']))
+        dist = match.group(1) if match else "d06" # Default to d06 if not found
+    except:
+        dist = "d06"
         
     return f"https://cwwp2.dot.ca.gov/vm/loc/{dist}/{cam_id}.htm"
 
@@ -99,4 +98,5 @@ try:
 
 except Exception as e:
     st.error(f"⚠️ Error: {e}")
+
 

@@ -29,28 +29,23 @@ try:
     df = load_data()
     st.sidebar.title("🛠️ Dashboard Controls")
     
-    # --- Quick Elevation Presets (Modified for Force Refresh) ---
     st.sidebar.subheader("Quick Elevation Filter")
     
     if 'elev_slider' not in st.session_state:
         st.session_state.elev_slider = (int(df['elevation'].min()), int(df['elevation'].max()))
 
     col1, col2 = st.sidebar.columns(2)
-    # Using a list of tuples to be absolutely explicit with the labels
-    presets = [
-        (1000, "> 1000 ft"), (2000, "> 2000 ft"), 
-        (3000, "> 3000 ft"), (4000, "> 4000 ft"), 
-        (5000, "> 5000 ft"), (6000, "> 6000 ft"), 
-        (7000, "> 7000 ft"), (8000, "> 8000 ft")
-    ]
+    # Using Unicode \u003E to force the '>' symbol to render
+    presets = [1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000]
     
-    for i, (val, label) in enumerate(presets):
+    for i, p in enumerate(presets):
         target_col = col1 if i % 2 == 0 else col2
-        # Adding 'v2' to the key forces Streamlit to treat this as a brand-new UI element
-        if target_col.button(label, key=f"btn_v2_{val}"):
-            st.session_state.elev_slider = (val, int(df['elevation'].max()))
+        # Hard-coded Unicode string to bypass text stripping
+        label_text = f"\u003E {p} ft"
+        if target_col.button(label_text, key=f"force_btn_{p}"):
+            st.session_state.elev_slider = (p, int(df['elevation'].max()))
 
-    if st.sidebar.button("🔄 Reset to All", key="btn_v2_reset"):
+    if st.sidebar.button("🔄 Reset to All", key="force_btn_reset"):
         st.session_state.elev_slider = (int(df['elevation'].min()), int(df['elevation'].max()))
 
     st.sidebar.markdown("---")
@@ -65,7 +60,7 @@ try:
     filtered_df = df[df['elevation'].between(elev_range[0], elev_range[1])]
 
     # --- Map Interface ---
-    st.title(f"📡 Hanford CWA Live Feeds ({len(filtered_df)} Cameras)")
+    st.title(f"Hanford CWA Live Feeds ({len(filtered_df)} Cameras)")
     scan_time = datetime.utcnow().strftime('%H:%M UTC')
     st.caption(f"Radar Auto-Refresh Active | Current UTC: {scan_time}")
 

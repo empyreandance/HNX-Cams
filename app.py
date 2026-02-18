@@ -12,11 +12,10 @@ st.set_page_config(layout="wide", page_title="HNX Live Feeds", page_icon="📡")
 st_autorefresh(interval=5 * 60 * 1000, key="radar_refresh")
 
 # --- NO-DIMMING CSS ---
-# Prevents the screen from "blinking" or fading when the 5-minute refresh triggers
 st.markdown(
     """
     <style>
-    .stApp > header {display: none;} /* Optional: Hides the hamburger menu if you want a cleaner look */
+    .stApp > header {display: none;}
     
     /* PREVENT SCREEN DIMMING */
     div[data-testid="stAppViewContainer"] > .main > div {
@@ -137,15 +136,20 @@ try:
 
     # --- SIDEBAR LAYOUT ---
     st.sidebar.title("🛠️ Dashboard Controls")
+
+    # 0. Radar Opacity (Top)
+    st.sidebar.subheader("0. Weather Radar")
+    radar_opacity = st.sidebar.slider("Radar Opacity", 0.0, 1.0, 0.55, step=0.05, key="radar_opacity")
+    st.sidebar.markdown("---")
     
-    # 1. Networks Filter (Top)
+    # 1. Networks Filter
     st.sidebar.subheader("1. Networks")
     all_sources = df['source'].unique().tolist()
     selected_sources = st.sidebar.multiselect("Select Sources", all_sources, default=all_sources)
     
     st.sidebar.markdown("---")
 
-    # 2. Elevation Slider (Middle)
+    # 2. Elevation Slider
     st.sidebar.subheader("2. Elevation Filter")
     
     if 'elev_slider' not in st.session_state:
@@ -160,10 +164,10 @@ try:
 
     st.sidebar.markdown("---")
 
-    # 3. Quick Buttons (Bottom - Single Column)
+    # 3. Quick Buttons
     st.sidebar.subheader("3. Quick Select")
     
-    # Define ranges. High values (e.g. 15000) are placeholders.
+    # Define ranges
     ranges = [
         (0, 1000), (1000, 2000), (2000, 3000), (3000, 4000),
         (4000, 5000), (5000, 6000), (6000, 7000), (7000, 8000),
@@ -179,7 +183,6 @@ try:
         if safe_low < DATA_MAX:
             if low == 8000:
                 label = "8,000+ ft"
-                # For the top bucket, always stretch to the absolute max
                 final_val = (safe_low, DATA_MAX)
             else:
                 label = f"{low:,} - {high:,} ft"
@@ -214,13 +217,14 @@ try:
 
     m = folium.Map(location=[36.32, -119.64], zoom_start=7, tiles="OpenTopoMap")
     
+    # Radar Layer controlled by slider
     folium.WmsTileLayer(
         url="https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi",
         layers="nexrad-n0q-900913",
         name="Live Radar",
         fmt="image/png",
         transparent=True,
-        opacity=0.55
+        opacity=radar_opacity  # Linked to sidebar slider
     ).add_to(m)
 
     # Grouping Logic
@@ -233,13 +237,13 @@ try:
         
         # --- COLOR CODING LOGIC ---
         if len(sources) > 1:
-            color = "purple"  # Mixed location
+            color = "purple"
         elif "Caltrans" in sources:
-            color = "#d62828" # Red
+            color = "#d62828"
         elif "SierraTel" in sources:
-            color = "#f4a261" # Orange for Sierra Tel
+            color = "#f4a261"
         else:
-            color = "#005f73" # Teal for ALERTCalifornia
+            color = "#005f73"
 
         popup_html = generate_popup_html(group)
         count = len(group)

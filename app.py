@@ -68,7 +68,9 @@ def generate_popup_html(group):
                 dist = match.group(1) if match else "d06"
             except: dist = "d06"
             player_url = f"https://cwwp2.dot.ca.gov/vm/loc/{dist}/{cam_id}.htm"
-            html_content += f'<iframe src="{player_url}" width="100%" height="200" frameborder="0" scrolling="no" style="border-radius:4px; border:1px solid #ccc;"></iframe>'
+            
+            # UPDATED: Increased height from 200 to 280 to fit 4:3 aspect ratio cameras
+            html_content += f'<iframe src="{player_url}" width="100%" height="280" frameborder="0" scrolling="no" style="border-radius:4px; border:1px solid #ccc;"></iframe>'
             html_content += f'<a href="{player_url}" target="_blank" style="display:block; text-align:right; font-size:10px; margin-top:2px;">🔗 Full Player</a>'
 
         elif source == "SierraTel":
@@ -104,7 +106,7 @@ def generate_popup_html(group):
 
     html_content += '</div>'
     return html_content
-
+    
 try:
     df = load_data()
     if df.empty:
@@ -240,3 +242,4 @@ try:
 
 except Exception as e:
     st.error(f"⚠️ Dashboard error: {e}")
+

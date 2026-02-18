@@ -31,8 +31,7 @@ def load_data():
     
     if os.path.exists(FILES["ALERTCalifornia"]):
         df_alert = pd.read_csv(FILES["ALERTCalifornia"])
-        # If the CSV doesn't have a source column, default to ALERTCalifornia
-        # But our new rows have "SierraTel", so we trust the column if it exists
+        # Default to ALERTCalifornia if source column is missing
         if "source" not in df_alert.columns:
             df_alert["source"] = "ALERTCalifornia"
         dfs.append(df_alert)
@@ -43,6 +42,7 @@ def load_data():
 def generate_popup_html(group):
     """
     Creates a single HTML popup containing ALL cameras at this location.
+    Handles Caltrans (Iframe), SierraTel (Launcher), and ALERTCalifornia (Image).
     """
     html_content = f'<div style="width:340px; max-height:400px; overflow-y:auto; font-family:sans-serif;">'
     
@@ -72,13 +72,14 @@ def generate_popup_html(group):
             html_content += f'<a href="{player_url}" target="_blank" style="display:block; text-align:right; font-size:10px; margin-top:2px;">🔗 Full Player</a>'
 
         elif source == "SierraTel":
-            # --- SIERRA TEL LAUNCHER ---
-            # Since their site blocks embedding (X-Frame-Options), we provide a clean launch button.
+            # --- SIERRA TEL LAUNCHER WITH INSTRUCTION ---
             html_content += f'''
-            <div style="background:#f8f9fa; border:1px solid #ddd; border-radius:4px; padding:15px; text-align:center;">
-                <div style="font-size:40px; margin-bottom:10px;">🎥</div>
-                <div style="font-size:12px; color:#555; margin-bottom:10px;">
-                    Live feed protected by provider security.<br>Click below to view.
+            <div style="background:#fff3cd; border:1px solid #ffeeba; border-radius:4px; padding:15px; text-align:center;">
+                <div style="font-size:30px; margin-bottom:10px;">🎥</div>
+                <div style="font-size:11px; color:#856404; margin-bottom:10px; line-height:1.4;">
+                    <strong>Security Restriction:</strong><br>
+                    Feed cannot be embedded directly.<br><br>
+                    <span style="text-decoration:underline;">Please select <b>{name.replace('Sierra Tel: ', '')}</b> from the list on the next page.</span>
                 </div>
                 <a href="{url}" target="_blank" style="
                     background-color: #f4a261; 
@@ -89,12 +90,13 @@ def generate_popup_html(group):
                     font-size: 12px; 
                     font-weight: bold; 
                     display: inline-block;">
-                    🚀 Launch Live Feed
+                    🚀 Launch Site
                 </a>
             </div>
             '''
 
-        elif source == "ALERTCalifornia":
+        else: 
+            # Default to ALERTCalifornia (Image Source)
             html_content += f'<img src="{url}" width="100%" style="border-radius:4px; border:1px solid #ccc;" onerror="this.src=\'https://via.placeholder.com/320x200?text=Feed+Offline\';">'
             html_content += f'<a href="{url}" target="_blank" style="display:block; text-align:right; font-size:10px; margin-top:2px;">🔗 Full Image</a>'
         
@@ -102,6 +104,7 @@ def generate_popup_html(group):
 
     html_content += '</div>'
     return html_content
+
 try:
     df = load_data()
     if df.empty:
@@ -237,5 +240,3 @@ try:
 
 except Exception as e:
     st.error(f"⚠️ Dashboard error: {e}")
-
-

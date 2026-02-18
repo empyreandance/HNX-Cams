@@ -18,7 +18,6 @@ FILES = {
 }
 
 # --- CALLBACK FUNCTION ---
-# This ensures the slider updates BEFORE the page reloads
 def set_elevation(min_val, max_val):
     st.session_state.elev_slider = (min_val, max_val)
 
@@ -43,7 +42,6 @@ def generate_popup_html(group):
     """
     html_content = f'<div style="width:340px; max-height:400px; overflow-y:auto; font-family:sans-serif;">'
     
-    # Title (use the first camera's location name generally)
     first_row = group.iloc[0]
     location_title = first_row['name'].split(":")[1].strip() if ":" in first_row['name'] else first_row['name']
     
@@ -84,6 +82,10 @@ try:
         st.error("⚠️ No data files found.")
         st.stop()
 
+    # Calculate actual data bounds
+    DATA_MIN = int(df['elevation'].min())
+    DATA_MAX = int(df['elevation'].max())
+
     # --- SIDEBAR LAYOUT ---
     st.sidebar.title("🛠️ Dashboard Controls")
     
@@ -97,15 +99,13 @@ try:
     # 2. Elevation Slider (Middle)
     st.sidebar.subheader("2. Elevation Filter")
     
-    # Initialize slider state if not set
     if 'elev_slider' not in st.session_state:
-        st.session_state.elev_slider = (int(df['elevation'].min()), int(df['elevation'].max()))
+        st.session_state.elev_slider = (DATA_MIN, DATA_MAX)
 
-    # The slider automatically reads/writes to st.session_state.elev_slider
     elev_range = st.sidebar.slider(
         "Range (ft)", 
-        int(df['elevation'].min()), 
-        int(df['elevation'].max()), 
+        DATA_MIN, 
+        DATA_MAX, 
         key="elev_slider"
     )
 
@@ -114,37 +114,42 @@ try:
     # 3. Quick Buttons (Bottom - Single Column)
     st.sidebar.subheader("3. Quick Select")
     
+    # Define ranges. High values (e.g. 15000) are placeholders.
     ranges = [
         (0, 1000), (1000, 2000), (2000, 3000), (3000, 4000),
         (4000, 5000), (5000, 6000), (6000, 7000), (7000, 8000),
-        (8000, 15000)
+        (8000, 15000) 
     ]
     
-    # Create vertical stack of buttons
     for low, high in ranges:
-        if low == 8000:
-            label = "8,000+ ft"
-            val_high = max(high, int(df['elevation'].max()))
-        else:
-            label = f"{low:,} - {high:,} ft"
-            val_high = high
-            
-        # on_click updates the state BEFORE the rerun, so the slider at the top moves immediately
-        st.sidebar.button(
-            label, 
-            key=f"btn_{low}", 
-            on_click=set_elevation, 
-            args=(low, val_high),
-            use_container_width=True  # Makes buttons span the full sidebar width
-        )
+        # Logic to ensure we never exceed the actual data maximum
+        safe_high = min(high, DATA_MAX)
+        safe_low = min(low, DATA_MAX)
+        
+        # Only show the button if the range starts within our data
+        if safe_low < DATA_MAX:
+            if low == 8000:
+                label = "8,000+ ft"
+                # For the top bucket, always stretch to the absolute max
+                final_val = (safe_low, DATA_MAX)
+            else:
+                label = f"{low:,} - {high:,} ft"
+                final_val = (safe_low, safe_high)
+                
+            st.sidebar.button(
+                label, 
+                key=f"btn_{low}", 
+                on_click=set_elevation, 
+                args=final_val,
+                use_container_width=True
+            )
 
-    # Reset Button at the very bottom
     st.sidebar.markdown("---")
     st.sidebar.button(
         "🔄 Reset Full Range", 
         key="reset_btn",
         on_click=set_elevation,
-        args=(int(df['elevation'].min()), int(df['elevation'].max())),
+        args=(DATA_MIN, DATA_MAX),
         use_container_width=True
     )
 

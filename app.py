@@ -17,6 +17,11 @@ FILES = {
     "ALERTCalifornia": "cctv_alertca.csv"
 }
 
+# --- CALLBACK FUNCTION ---
+# This ensures the slider updates BEFORE the page reloads
+def set_elevation(min_val, max_val):
+    st.session_state.elev_slider = (min_val, max_val)
+
 @st.cache_data(ttl=300)
 def load_data():
     dfs = []
@@ -79,27 +84,79 @@ try:
         st.error("⚠️ No data files found.")
         st.stop()
 
+    # --- SIDEBAR LAYOUT ---
     st.sidebar.title("🛠️ Dashboard Controls")
     
-    # Filters
-    st.sidebar.subheader("Filters")
+    # 1. Networks Filter (Top)
+    st.sidebar.subheader("1. Networks")
     all_sources = df['source'].unique().tolist()
-    selected_sources = st.sidebar.multiselect("Networks", all_sources, default=all_sources)
+    selected_sources = st.sidebar.multiselect("Select Sources", all_sources, default=all_sources)
     
+    st.sidebar.markdown("---")
+
+    # 2. Elevation Slider (Middle)
+    st.sidebar.subheader("2. Elevation Filter")
+    
+    # Initialize slider state if not set
     if 'elev_slider' not in st.session_state:
         st.session_state.elev_slider = (int(df['elevation'].min()), int(df['elevation'].max()))
 
-    elev_range = st.sidebar.slider("Elevation (ft)", int(df['elevation'].min()), int(df['elevation'].max()), key="elev_slider")
+    # The slider automatically reads/writes to st.session_state.elev_slider
+    elev_range = st.sidebar.slider(
+        "Range (ft)", 
+        int(df['elevation'].min()), 
+        int(df['elevation'].max()), 
+        key="elev_slider"
+    )
 
-    # Filter Data
+    st.sidebar.markdown("---")
+
+    # 3. Quick Buttons (Bottom - Single Column)
+    st.sidebar.subheader("3. Quick Select")
+    
+    ranges = [
+        (0, 1000), (1000, 2000), (2000, 3000), (3000, 4000),
+        (4000, 5000), (5000, 6000), (6000, 7000), (7000, 8000),
+        (8000, 15000)
+    ]
+    
+    # Create vertical stack of buttons
+    for low, high in ranges:
+        if low == 8000:
+            label = "8,000+ ft"
+            val_high = max(high, int(df['elevation'].max()))
+        else:
+            label = f"{low:,} - {high:,} ft"
+            val_high = high
+            
+        # on_click updates the state BEFORE the rerun, so the slider at the top moves immediately
+        st.sidebar.button(
+            label, 
+            key=f"btn_{low}", 
+            on_click=set_elevation, 
+            args=(low, val_high),
+            use_container_width=True  # Makes buttons span the full sidebar width
+        )
+
+    # Reset Button at the very bottom
+    st.sidebar.markdown("---")
+    st.sidebar.button(
+        "🔄 Reset Full Range", 
+        key="reset_btn",
+        on_click=set_elevation,
+        args=(int(df['elevation'].min()), int(df['elevation'].max())),
+        use_container_width=True
+    )
+
+    # --- FILTER DATA ---
     filtered_df = df[
         (df['elevation'].between(elev_range[0], elev_range[1])) &
         (df['source'].isin(selected_sources))
     ]
 
-    # --- Map Interface ---
+    # --- MAIN MAP ---
     st.title(f"📡 Hanford CWA Live Feeds")
-    st.caption(f"Showing {len(filtered_df)} cameras grouped by location")
+    st.caption(f"Showing {len(filtered_df)} cameras grouped by location | Range: {elev_range[0]}-{elev_range[1]} ft")
 
     m = folium.Map(location=[36.32, -119.64], zoom_start=7, tiles="OpenTopoMap")
     
@@ -112,34 +169,27 @@ try:
         opacity=0.55
     ).add_to(m)
 
-    # --- GROUPING LOGIC ---
-    # Group by Lat/Lon to handle stacked cameras
-    # We round to 4 decimals to catch "very close" cameras that should be grouped
+    # Grouping Logic
     filtered_df['lat_round'] = filtered_df['lat'].round(4)
     filtered_df['lon_round'] = filtered_df['lon'].round(4)
-    
     grouped = filtered_df.groupby(['lat_round', 'lon_round'])
 
     for (lat, lon), group in grouped:
-        # Determine marker color (if mixed group, use Purple, otherwise source color)
         sources = group['source'].unique()
         if len(sources) > 1:
-            color = "purple" # Mixed location
+            color = "purple"
         elif "Caltrans" in sources:
             color = "#d62828"
         else:
             color = "#005f73"
 
-        # Generate the multi-camera popup
         popup_html = generate_popup_html(group)
-        
-        # Tooltip shows count if > 1
         count = len(group)
         tooltip_text = f"{group.iloc[0]['name']} ({count} Cams)" if count > 1 else group.iloc[0]['name']
 
         folium.CircleMarker(
             location=[lat, lon],
-            radius=7 if count > 1 else 5,  # Make multi-cam markers slightly bigger
+            radius=7 if count > 1 else 5,
             color=color,
             fill=True,
             fill_color=color,

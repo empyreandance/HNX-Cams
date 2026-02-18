@@ -240,3 +240,5 @@ lon,lat,name,url,elevation,source
 -119.1175,36.8041,ALERTCA: Delilah Lookout 2,https://cameras.alertcalifornia.org/public-camera-data/Axis-DelilahLookout2/latest-frame.jpg,5155,ALERTCalifornia
 -120.8118,35.5097,ALERTCA: Santa Rita Quarry 2,https://cameras.alertcalifornia.org/public-camera-data/Axis-SantaRitaQuarry2/latest-frame.jpg,1815,ALERTCalifornia
 -118.8983,34.835899999999995,ALERTCA: Lebec Oaks 2,https://cameras.alertcalifornia.org/public-camera-data/Axis-LebecOaks2/latest-frame.jpg,4923,ALERTCalifornia
+-119.6586,37.3323,Sierra Tel: Deadwood,https://video.nest.com/embedded/live/wZ61X42K0W?autoplay=1,4514,SierraTel
+-119.9234,37.5469,Sierra Tel: Midpines,https://video.nest.com/embedded/live/u28s5K2Q2u?autoplay=1,2585,SierraTel

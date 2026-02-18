@@ -20,152 +20,134 @@ FILES = {
 @st.cache_data(ttl=300)
 def load_data():
     dfs = []
-    
-    # Load Caltrans Data (Original)
     if os.path.exists(FILES["Caltrans"]):
         df_cal = pd.read_csv(FILES["Caltrans"])
-        df_cal["source"] = "Caltrans" # Tag original data
+        df_cal["source"] = "Caltrans"
         dfs.append(df_cal)
     
-    # Load ALERTCalifornia Data (New)
     if os.path.exists(FILES["ALERTCalifornia"]):
         df_alert = pd.read_csv(FILES["ALERTCalifornia"])
         dfs.append(df_alert)
         
-    if not dfs:
-        return pd.DataFrame()
-        
+    if not dfs: return pd.DataFrame()
     return pd.concat(dfs, ignore_index=True)
 
-def get_player_html(row):
+def generate_popup_html(group):
     """
-    Generates the HTML for the popup based on the camera source.
+    Creates a single HTML popup containing ALL cameras at this location.
     """
-    name = row['name']
-    elev = row['elevation']
-    source = row.get('source', 'Caltrans')
-    url = str(row['url'])
+    html_content = f'<div style="width:340px; max-height:400px; overflow-y:auto; font-family:sans-serif;">'
+    
+    # Title (use the first camera's location name generally)
+    first_row = group.iloc[0]
+    location_title = first_row['name'].split(":")[1].strip() if ":" in first_row['name'] else first_row['name']
+    
+    html_content += f'<h4 style="margin:0; position:sticky; top:0; background:white; padding:5px 0; border-bottom:2px solid #ccc;">📍 {location_title}</h4>'
 
-    # --- Caltrans Logic (Iframe Player) ---
-    if source == "Caltrans":
-        cam_id = re.sub(r'[^a-zA-Z0-9]', '', name).lower()
-        try:
-            match = re.search(r'/data/(d\d+)/', url)
-            dist = match.group(1) if match else "d06"
-        except:
-            dist = "d06"
+    for _, row in group.iterrows():
+        name = row['name']
+        elev = row['elevation']
+        source = row.get('source', 'Caltrans')
+        url = str(row['url'])
         
-        player_url = f"https://cwwp2.dot.ca.gov/vm/loc/{dist}/{cam_id}.htm"
-        
-        return f'''
-            <div style="width:320px; font-family: sans-serif;">
-                <h4 style="margin:0; color: #d62828;">{name}</h4>
-                <p style="margin:5px 0; font-size: 11px;">Source: Caltrans | Elev: <b>{elev} ft</b></p>
-                <iframe src="{player_url}" width="320" height="260" frameborder="0" scrolling="no" style="border-radius:8px; border:1px solid #ccc;"></iframe>
-                <div style="margin-top: 10px; text-align: center;">
-                    <a href="{player_url}" target="_blank" style="color: #d62828; font-size: 11px; font-weight: bold; text-decoration: none;">🔗 Open Full Player</a>
-                </div>
-            </div>
-        '''
+        html_content += f'<div style="margin-top:15px; border-bottom:1px solid #eee; padding-bottom:10px;">'
+        html_content += f'<div style="font-weight:bold; color:#005f73; font-size:13px;">📷 {name}</div>'
+        html_content += f'<div style="font-size:10px; color:#666; margin-bottom:4px;">Elev: {elev} ft | Src: {source}</div>'
 
-    # --- ALERTCalifornia Logic (Direct Image/Stream) ---
-    elif source == "ALERTCalifornia":
-        # ALERTCalifornia URLs in the API are often direct images or m3u8 streams.
-        # For simplicity in Folium popups, we usually display the latest image.
-        # If the URL implies a stream (rare in the public CSV output), we link to it.
+        if source == "Caltrans":
+            cam_id = re.sub(r'[^a-zA-Z0-9]', '', name).lower()
+            try:
+                match = re.search(r'/data/(d\d+)/', url)
+                dist = match.group(1) if match else "d06"
+            except: dist = "d06"
+            player_url = f"https://cwwp2.dot.ca.gov/vm/loc/{dist}/{cam_id}.htm"
+            html_content += f'<iframe src="{player_url}" width="100%" height="200" frameborder="0" scrolling="no" style="border-radius:4px; border:1px solid #ccc;"></iframe>'
+            html_content += f'<a href="{player_url}" target="_blank" style="display:block; text-align:right; font-size:10px; margin-top:2px;">🔗 Full Player</a>'
+
+        elif source == "ALERTCalifornia":
+            html_content += f'<img src="{url}" width="100%" style="border-radius:4px; border:1px solid #ccc;" onerror="this.src=\'https://via.placeholder.com/320x200?text=Feed+Offline\';">'
+            html_content += f'<a href="{url}" target="_blank" style="display:block; text-align:right; font-size:10px; margin-top:2px;">🔗 Full Image</a>'
         
-        return f'''
-            <div style="width:320px; font-family: sans-serif;">
-                <h4 style="margin:0; color: #005f73;">{name}</h4>
-                <p style="margin:5px 0; font-size: 11px;">Source: ALERTCalifornia | Elev: <b>{elev} ft</b></p>
-                <img src="{url}" width="320" style="border-radius:8px; border:1px solid #ccc;" onerror="this.onerror=null; this.src='https://via.placeholder.com/320x200?text=Feed+Offline';">
-                <div style="margin-top: 10px; text-align: center;">
-                    <a href="{url}" target="_blank" style="color: #005f73; font-size: 11px; font-weight: bold; text-decoration: none;">🔗 Open Full Feed</a>
-                </div>
-                <p style="font-size:9px; color:#666; margin-top:5px;"><i>Data Courtesy: ALERTCalifornia & UCSD</i></p>
-            </div>
-        '''
-    return ""
+        html_content += '</div>'
+
+    html_content += '</div>'
+    return html_content
 
 try:
     df = load_data()
-    
     if df.empty:
-        st.error("⚠️ No data files found. Please ensure 'cctv_hnx.csv' and 'cctv_alertca.csv' are in the directory.")
+        st.error("⚠️ No data files found.")
         st.stop()
 
     st.sidebar.title("🛠️ Dashboard Controls")
     
-    # Source Filter
-    st.sidebar.subheader("Filter by Source")
+    # Filters
+    st.sidebar.subheader("Filters")
     all_sources = df['source'].unique().tolist()
-    selected_sources = st.sidebar.multiselect("Select Networks", all_sources, default=all_sources)
+    selected_sources = st.sidebar.multiselect("Networks", all_sources, default=all_sources)
     
-    # Elevation Filter
-    st.sidebar.subheader("Elevation Filter")
     if 'elev_slider' not in st.session_state:
         st.session_state.elev_slider = (int(df['elevation'].min()), int(df['elevation'].max()))
 
-    col1, col2 = st.sidebar.columns(2)
-    presets = [1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000]
-    for i, p in enumerate(presets):
-        target_col = col1 if i % 2 == 0 else col2
-        if target_col.button(f"{p:,}+ ft", key=f"fixed_btn_{p}"):
-            st.session_state.elev_slider = (p, int(df['elevation'].max()))
+    elev_range = st.sidebar.slider("Elevation (ft)", int(df['elevation'].min()), int(df['elevation'].max()), key="elev_slider")
 
-    if st.sidebar.button("🔄 Reset to All", key="fixed_btn_reset"):
-        st.session_state.elev_slider = (int(df['elevation'].min()), int(df['elevation'].max()))
-
-    elev_range = st.sidebar.slider(
-        "Range (ft)", 
-        int(df['elevation'].min()), 
-        int(df['elevation'].max()), 
-        key="elev_slider"
-    )
-
-    # Apply Filters
+    # Filter Data
     filtered_df = df[
         (df['elevation'].between(elev_range[0], elev_range[1])) &
         (df['source'].isin(selected_sources))
     ]
 
     # --- Map Interface ---
-    st.title(f"📡 Hanford CWA Live Feeds ({len(filtered_df)} Cameras)")
-    scan_time = datetime.utcnow().strftime('%H:%M UTC')
-    st.caption(f"Sources: {', '.join(selected_sources)} | Radar Active | UTC: {scan_time}")
+    st.title(f"📡 Hanford CWA Live Feeds")
+    st.caption(f"Showing {len(filtered_df)} cameras grouped by location")
 
     m = folium.Map(location=[36.32, -119.64], zoom_start=7, tiles="OpenTopoMap")
-
-    # Radar Layer
+    
     folium.WmsTileLayer(
         url="https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi",
         layers="nexrad-n0q-900913",
         name="Live Radar",
         fmt="image/png",
         transparent=True,
-        opacity=0.55,
-        control=True
+        opacity=0.55
     ).add_to(m)
 
-    # Add Markers
-    for _, row in filtered_df.iterrows():
-        html = get_player_html(row)
+    # --- GROUPING LOGIC ---
+    # Group by Lat/Lon to handle stacked cameras
+    # We round to 4 decimals to catch "very close" cameras that should be grouped
+    filtered_df['lat_round'] = filtered_df['lat'].round(4)
+    filtered_df['lon_round'] = filtered_df['lon'].round(4)
+    
+    grouped = filtered_df.groupby(['lat_round', 'lon_round'])
+
+    for (lat, lon), group in grouped:
+        # Determine marker color (if mixed group, use Purple, otherwise source color)
+        sources = group['source'].unique()
+        if len(sources) > 1:
+            color = "purple" # Mixed location
+        elif "Caltrans" in sources:
+            color = "#d62828"
+        else:
+            color = "#005f73"
+
+        # Generate the multi-camera popup
+        popup_html = generate_popup_html(group)
         
-        # Color code markers by source
-        marker_color = "#d62828" if row['source'] == "Caltrans" else "#005f73"
-        
+        # Tooltip shows count if > 1
+        count = len(group)
+        tooltip_text = f"{group.iloc[0]['name']} ({count} Cams)" if count > 1 else group.iloc[0]['name']
+
         folium.CircleMarker(
-            location=[row['lat'], row['lon']],
-            radius=6, 
-            color=marker_color, 
-            fill=True, 
-            fill_color=marker_color, 
+            location=[lat, lon],
+            radius=7 if count > 1 else 5,  # Make multi-cam markers slightly bigger
+            color=color,
+            fill=True,
+            fill_color=color,
             fill_opacity=0.8,
-            popup=folium.Popup(html, max_width=350),
-            tooltip=f"{row['name']} ({row['elevation']} ft)"
+            popup=folium.Popup(popup_html, max_width=360),
+            tooltip=tooltip_text
         ).add_to(m)
 
-    folium.LayerControl().add_to(m)
     st_folium(m, width=1400, height=800)
 
 except Exception as e:

@@ -11,6 +11,27 @@ import os
 st.set_page_config(layout="wide", page_title="HNX Live Feeds", page_icon="📡")
 st_autorefresh(interval=5 * 60 * 1000, key="radar_refresh")
 
+# --- NO-DIMMING CSS ---
+# Prevents the screen from "blinking" or fading when the 5-minute refresh triggers
+st.markdown(
+    """
+    <style>
+    .stApp > header {display: none;} /* Optional: Hides the hamburger menu if you want a cleaner look */
+    
+    /* PREVENT SCREEN DIMMING */
+    div[data-testid="stAppViewContainer"] > .main > div {
+        opacity: 1 !important;
+        transition: none !important;
+    }
+    div[data-stale="true"] {
+        opacity: 1 !important;
+        transition: none !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 # File Paths
 FILES = {
     "Caltrans": "cctv_hnx.csv",
@@ -31,7 +52,6 @@ def load_data():
     
     if os.path.exists(FILES["ALERTCalifornia"]):
         df_alert = pd.read_csv(FILES["ALERTCalifornia"])
-        # Default to ALERTCalifornia if source column is missing
         if "source" not in df_alert.columns:
             df_alert["source"] = "ALERTCalifornia"
         dfs.append(df_alert)
@@ -68,8 +88,6 @@ def generate_popup_html(group):
                 dist = match.group(1) if match else "d06"
             except: dist = "d06"
             player_url = f"https://cwwp2.dot.ca.gov/vm/loc/{dist}/{cam_id}.htm"
-            
-            # UPDATED: Increased height from 200 to 280 to fit 4:3 aspect ratio cameras
             html_content += f'<iframe src="{player_url}" width="100%" height="280" frameborder="0" scrolling="no" style="border-radius:4px; border:1px solid #ccc;"></iframe>'
             html_content += f'<a href="{player_url}" target="_blank" style="display:block; text-align:right; font-size:10px; margin-top:2px;">🔗 Full Player</a>'
 
@@ -106,7 +124,7 @@ def generate_popup_html(group):
 
     html_content += '</div>'
     return html_content
-    
+
 try:
     df = load_data()
     if df.empty:
@@ -242,4 +260,3 @@ try:
 
 except Exception as e:
     st.error(f"⚠️ Dashboard error: {e}")
-

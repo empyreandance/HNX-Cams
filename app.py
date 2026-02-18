@@ -43,7 +43,6 @@ def load_data():
 def generate_popup_html(group):
     """
     Creates a single HTML popup containing ALL cameras at this location.
-    Handles Caltrans (Iframe), SierraTel (Nest Embed), and ALERTCalifornia (Image).
     """
     html_content = f'<div style="width:340px; max-height:400px; overflow-y:auto; font-family:sans-serif;">'
     
@@ -73,25 +72,29 @@ def generate_popup_html(group):
             html_content += f'<a href="{player_url}" target="_blank" style="display:block; text-align:right; font-size:10px; margin-top:2px;">🔗 Full Player</a>'
 
         elif source == "SierraTel":
-            # --- CSS CROP TRICK ---
-            # We embed the whole allowed website but "scroll" it down to show the video.
-            # The 'sandbox' attribute is crucial to stop the site from taking over your window.
-            html_content += f'<div style="width:100%; height:250px; overflow:hidden; border-radius:4px; border:1px solid #ccc; position:relative;">'
-            
-            # This inner iframe loads the site but is shifted UP by 400px (margin-top) to hide the header
+            # --- SIERRA TEL LAUNCHER ---
+            # Since their site blocks embedding (X-Frame-Options), we provide a clean launch button.
             html_content += f'''
-                <iframe src="{url}" 
-                        style="width:100%; height:800px; border:none; margin-top:-400px; margin-left:-10px;" 
-                        sandbox="allow-scripts allow-same-origin"
-                        scrolling="no">
-                </iframe>
+            <div style="background:#f8f9fa; border:1px solid #ddd; border-radius:4px; padding:15px; text-align:center;">
+                <div style="font-size:40px; margin-bottom:10px;">🎥</div>
+                <div style="font-size:12px; color:#555; margin-bottom:10px;">
+                    Live feed protected by provider security.<br>Click below to view.
+                </div>
+                <a href="{url}" target="_blank" style="
+                    background-color: #f4a261; 
+                    color: white; 
+                    padding: 8px 16px; 
+                    text-decoration: none; 
+                    border-radius: 4px; 
+                    font-size: 12px; 
+                    font-weight: bold; 
+                    display: inline-block;">
+                    🚀 Launch Live Feed
+                </a>
+            </div>
             '''
-            html_content += f'</div>'
-            html_content += f'<div style="font-size:9px; color:#888; margin-top:2px;">*Feed requires site embedding due to security restrictions.</div>'
-            html_content += f'<a href="{url}" target="_blank" style="display:block; text-align:right; font-size:10px; margin-top:2px;">🔗 Open Full Site</a>'
 
-        else: 
-            # Default to ALERTCalifornia (Image Source)
+        elif source == "ALERTCalifornia":
             html_content += f'<img src="{url}" width="100%" style="border-radius:4px; border:1px solid #ccc;" onerror="this.src=\'https://via.placeholder.com/320x200?text=Feed+Offline\';">'
             html_content += f'<a href="{url}" target="_blank" style="display:block; text-align:right; font-size:10px; margin-top:2px;">🔗 Full Image</a>'
         
@@ -99,7 +102,6 @@ def generate_popup_html(group):
 
     html_content += '</div>'
     return html_content
-
 try:
     df = load_data()
     if df.empty:
@@ -235,4 +237,5 @@ try:
 
 except Exception as e:
     st.error(f"⚠️ Dashboard error: {e}")
+
 

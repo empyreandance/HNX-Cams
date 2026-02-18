@@ -31,6 +31,10 @@ def load_data():
     
     if os.path.exists(FILES["ALERTCalifornia"]):
         df_alert = pd.read_csv(FILES["ALERTCalifornia"])
+        # If the CSV doesn't have a source column, default to ALERTCalifornia
+        # But our new rows have "SierraTel", so we trust the column if it exists
+        if "source" not in df_alert.columns:
+            df_alert["source"] = "ALERTCalifornia"
         dfs.append(df_alert)
         
     if not dfs: return pd.DataFrame()
@@ -39,6 +43,7 @@ def load_data():
 def generate_popup_html(group):
     """
     Creates a single HTML popup containing ALL cameras at this location.
+    Handles Caltrans (Iframe), SierraTel (Nest Embed), and ALERTCalifornia (Image).
     """
     html_content = f'<div style="width:340px; max-height:400px; overflow-y:auto; font-family:sans-serif;">'
     
@@ -67,7 +72,16 @@ def generate_popup_html(group):
             html_content += f'<iframe src="{player_url}" width="100%" height="200" frameborder="0" scrolling="no" style="border-radius:4px; border:1px solid #ccc;"></iframe>'
             html_content += f'<a href="{player_url}" target="_blank" style="display:block; text-align:right; font-size:10px; margin-top:2px;">🔗 Full Player</a>'
 
-        elif source == "ALERTCalifornia":
+        elif source == "SierraTel":
+            # --- NEST CAM EMBED LOGIC ---
+            # Uses a 16:9 aspect ratio container to fit the Nest stream perfectly
+            html_content += f'<div style="position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; max-width: 100%; background: #000;">'
+            html_content += f'<iframe src="{url}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius:4px; border:1px solid #ccc;" frameborder="0" allowfullscreen></iframe>'
+            html_content += f'</div>'
+            html_content += f'<a href="https://www.sierratel.com/community/" target="_blank" style="display:block; text-align:right; font-size:10px; margin-top:2px;">🔗 Sierra Tel Community</a>'
+
+        else: 
+            # Default to ALERTCalifornia (Image Source)
             html_content += f'<img src="{url}" width="100%" style="border-radius:4px; border:1px solid #ccc;" onerror="this.src=\'https://via.placeholder.com/320x200?text=Feed+Offline\';">'
             html_content += f'<a href="{url}" target="_blank" style="display:block; text-align:right; font-size:10px; margin-top:2px;">🔗 Full Image</a>'
         
@@ -181,12 +195,16 @@ try:
 
     for (lat, lon), group in grouped:
         sources = group['source'].unique()
+        
+        # --- COLOR CODING LOGIC ---
         if len(sources) > 1:
-            color = "purple"
+            color = "purple"  # Mixed location
         elif "Caltrans" in sources:
-            color = "#d62828"
+            color = "#d62828" # Red
+        elif "SierraTel" in sources:
+            color = "#f4a261" # Orange for Sierra Tel
         else:
-            color = "#005f73"
+            color = "#005f73" # Teal for ALERTCalifornia
 
         popup_html = generate_popup_html(group)
         count = len(group)
